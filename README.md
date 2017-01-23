@@ -4,6 +4,8 @@ This tool inserts mail from an mbox into the credential owner's Gmail account.
 
 Most logs are to stdout, prefixed by the mail file for easy grepping. FAILED imports attempt to provide mail file, message number and Message-id so you can try again, or debug the mbox.
 
+**For current bugs and known issues, see [BUGS.md](BUGS.md)**
+
 ## Installation
 
 * You need a GCP project and credential. Follow the instructions on the [Gmail API Quickstart](https://developers.google.com/gmail/api/quickstart/go) to get that set up, and install the golang libraries.
