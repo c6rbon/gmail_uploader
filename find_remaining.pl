@@ -18,7 +18,7 @@ while (<>) {
     
     my ($nfile, $message_num) = split(':', $file_messageno);
 
-    if (!$file){
+    if (!$file) {
 	$file = $nfile;
     }
     
