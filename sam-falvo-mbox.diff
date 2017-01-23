@@ -1,0 +1,122 @@
+diff --git a/mbox.go b/mbox.go
+index 7fe2257..c391d39 100644
+--- a/mbox.go
++++ b/mbox.go
+@@ -43,7 +43,7 @@ func (m *MboxStream) ReadMessage() (msg *Message, err error) {
+ 		return
+ 	}
+ 
+-	msg.headers, err = m.parseHeaders()
++	msg.headers, msg.allheaders, err = m.parseHeaders()
+ 	if err != nil {
+ 		msg = nil
+ 		return
+@@ -105,19 +105,21 @@ func extractSendingAddress(m *MboxStream) (who string, err error) {
+ // mapping from string to an array of strings.  Each header key corresponds to
+ // one or more strings as received in the mbox file.  For greatest fidelity,
+ // leading whitespace on continued lines is preserved.
+-func (m *MboxStream) parseHeaders() (hs map[string][]string, err error) {
++func (m *MboxStream) parseHeaders() (hs map[string][]string, allhs []string, err error) {
+ 	hs = make(map[string][]string, 0)
++
+ 	for {
+ 		key, values, err := m.parseHeader()
+ 		if err != nil {
+-			return nil, err
++			return nil, nil, err
+ 		}
+ 		hs[key] = values
++		allhs = append(allhs, fmt.Sprintf("%s: %s", key, strings.Join(values, "\n")))
+ 		if m.prefetch[0] == '\n' {
+ 			break
+ 		}
+ 	}
+-	return hs, nil
++	return hs, allhs, nil
+ }
+ 
+ // parseHeader will read in a single header from the mbox file.
+@@ -197,6 +199,10 @@ func (m *MboxStream) nextLine() error {
+ 	if err != nil {
+ 		return err
+ 	}
++	// There may be long lines.
++	if len(slice) > cap(m.prefetch) {
++		m.prefetch = make([]byte, len(slice))
++	}
+ 	m.prefetch = m.prefetch[0:len(slice)]
+ 	copy(m.prefetch, slice)
+ 	m.prefetchLength = len(m.prefetch)
+diff --git a/message.go b/message.go
+index bf03a3e..3fcb4c6 100644
+--- a/message.go
++++ b/message.go
+@@ -2,13 +2,17 @@
+ 
+ package mbox
+ 
+-import "io"
++import (
++	"io"
++	"strconv"
++)
+ 
+ // A Message represents a single message in the file.
+ type Message struct {
+ 	mbox           *MboxStream
+ 	headers        map[string][]string
+ 	sendingAddress string
++	allheaders     []string
+ }
+ 
+ // A bodyReader implements an io.Reader, confined to the current message to
+@@ -18,6 +22,7 @@ type bodyReader struct {
+ 	mbox   *MboxStream
+ 	where  int
+ 	srcErr error
++	read   int
+ }
+ 
+ // Sender() tells who sent the message.  This corresponds to the e-mail address
+@@ -58,6 +63,10 @@ func (m *Message) Headers() map[string][]string {
+ 	return m.headers
+ }
+ 
++func (m *Message) AllHeaders() []string {
++	return m.allheaders
++}
++
+ // BodyReader() provides an io.Reader compatible object that will read the body
+ // of the message.  It will return io.EOF if you attempt to read beyond the end
+ // of the message.
+@@ -75,12 +84,30 @@ func (r *bodyReader) Read(bs []byte) (n int, err error) {
+ 		return 0, r.srcErr
+ 	}
+ 
++	eom := false
++	
+ 	if (len(r.mbox.prefetch) > 5) && (string(r.mbox.prefetch[0:5]) == "From ") {
++		eom = true
++	}
++
++	// Special case - this might be MBOXCL2, so be tolerant by trusting the headers.
++	if eom && r.msg.Headers()["Content-Length"] != nil {
++		cl, err := strconv.Atoi(r.msg.Headers()["Content-Length"][0])
++		if err != nil {
++			return 0, err
++		}
++		if r.read < cl {
++			eom = false
++		}
++	}
++
++	if eom {
+ 		return 0, io.EOF
+ 	}
+ 
+ 	n = copy(bs, r.mbox.prefetch[r.where:])
+ 	r.where = r.where + n
++	r.read += n
+ 	if r.where >= len(r.mbox.prefetch) {
+ 		r.where = 0
+ 		r.srcErr = r.mbox.nextLine()
