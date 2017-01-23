@@ -6,6 +6,14 @@ The first time you use it, will auth the needed OAuth scopes, and cache the toke
 
 Most logs are to stdout, prefixed by the mail file for easy grepping. FAILED imports attempt to provide mail file, message number and Message-id so you can try again, or debug the mbox.
 
+## Testing
+
+This supports a `-n` argument, which prevents actual message uploads, but will:
+
+* parse the mailbox
+* print each message as it is parsed
+* output the base64 url encoded version of the message (useful for manually using the API via a browser)
+
 ## Examples
 
 ### Single mailbox
