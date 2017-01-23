@@ -108,8 +108,6 @@ func main() {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
 
-	// If modifying these scopes, delete your previously saved credentials
-	// at ~/.credentials/gmail-go-quickstart.json
 	config, err := google.ConfigFromJSON(b, gmail.GmailInsertScope, gmail.GmailModifyScope, gmail.MailGoogleComScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
@@ -164,7 +162,7 @@ func main() {
 	cnt := 0
 	upld := 0
 
-	buffer := make([]byte, 1000)
+	buffer := make([]byte, 1024)
 
 	for {
 		msg, err := ms.ReadMessage()
