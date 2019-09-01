@@ -16,15 +16,17 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"context"
 	"github.com/sam-falvo/mbox"
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
 )
 
 var no_upload = flag.Bool("n", false, "Do not actually upload. Print messages instead.")
+var print_encoded = flag.Bool("print_encoded", false, "When printing messages instead of uploading, print encoded value.")
 var only_msgno = flag.String("only_msgno", "", "Comma separated list of message number to constrain uploads to.")
 
 // getClient uses a Context and Config to retrieve a Token
@@ -204,8 +206,13 @@ func main() {
 		if mid == nil {
 			mid = msg.Headers()["Message-Id"]
 		}
-		if mid == nil {
-			mid = msg.Headers()["Message-id"]
+
+		mdate := msg.Headers()["Date"]
+		// Date fix
+		const longForm = "Mon, 17 Jul 18:12:04 2000 -0500"
+		t, err := time.Parse(longForm, mdate[0])
+		if err == nil {
+			fmt.Println("fix date", t)
 		}
 
 		if *no_upload != true {
@@ -222,10 +229,13 @@ func main() {
 				}
 			}
 		} else {
-			fmt.Printf(email.String())
-			fmt.Println("-----------------------------------------------")
-			fmt.Println(encoded)
-			fmt.Println("-----------------------------------------------")
+			if *only_msgno != "" && msgno[cnt] == 1 {
+				if *print_encoded != true {
+					fmt.Printf(email.String())
+				} else {
+					fmt.Println(encoded)
+				}
+			}
 		}
 		cnt++
 	}
