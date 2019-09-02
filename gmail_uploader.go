@@ -167,7 +167,7 @@ func main() {
 	if *label != "" {
 		r, err := srv.Users.Labels.List(user).Do()
 		if err != nil {
-			log.Fatalf("Unable to retrieve labels: %v", err)
+			log.Fatalf("%s EXIT: Unable to retrieve labels: %v (no messages processed)", fn, err)
 		}
 		for _, l := range r.Labels {
 			if l.Name == *label {
@@ -224,7 +224,6 @@ func main() {
 			
 			t, match := time.Parse(wrongForm, mdate[0])
 			if match == nil {
-				fmt.Println("----> fix date -->", mdate, " -> ", t.Format(time.RFC1123Z))
 				mdate[0] = t.Format(time.RFC1123Z)
 				fix_date = true
 			}
