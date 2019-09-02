@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"os/user"
@@ -167,22 +168,83 @@ func main() {
 	buffer := make([]byte, 1024)
 
 	for {
-		msg, err := ms.ReadMessage()
-		if err != nil {
-			if err == io.EOF {
+		msg, mserr := ms.ReadMessage()
+		if mserr != nil {
+			if mserr == io.EOF {
 				// We're done.
 				break
 			}
-			log.Printf("%s:%d Error parsing message: %v", fn, cnt, err)
+			log.Printf("%s:%d Error parsing message: %v", fn, cnt, mserr)
 		}
 
+		process_msg := false
+		if *only_msgno != "" && msgno[cnt] == 1 {
+			process_msg = true
+		}
+		if *only_msgno == "" {
+			process_msg = true
+		}
+		
+		// Date fix
+		fix_date := false
+		const wrongForm = "Mon, 2 Jan 15:04:05 2006 -0700"
+		if process_msg {
+			mdate := msg.Headers()["Date"]
+
+
+			_, t_err := mail.ParseDate(mdate[0])
+			if t_err != nil {
+				// # 1 - silly UT issue
+				if strings.HasSuffix(mdate[0], "UT") {
+					mdate[0] += "C"
+					fix_date = true
+					parsed_time, t_err := mail.ParseDate(mdate[0])
+					if t_err != nil {
+						log.Fatalf("Cannot parse date %s", mdate[0])
+					} else {
+						mdate[0] = parsed_time.Format(time.RFC1123Z)}
+				}
+			}
+//			fmt.Println(parsed_date.Format(time.UnixDate))
+			
+			t, match := time.Parse(wrongForm, mdate[0])
+			if match == nil {
+				fmt.Println("----> fix date -->", mdate, " -> ", t.Format(time.RFC1123Z))
+				mdate[0] = t.Format(time.RFC1123Z)
+				fix_date = true
+			}
+
+			// just standardize the dates. :P
+			clean_date, t_err := mail.ParseDate(mdate[0])
+                        if t_err != nil {
+				log.Fatalf("%s:%d Cannot parse date %s", fn, cnt, mdate[0])
+			} else {
+				mdate[0] = clean_date.Format(time.RFC1123Z)
+				fix_date = true
+			}
+		}
+			
+		// Build email no matter what, since we need to read through the mbox buffer anyhow.
 		var email bytes.Buffer
 		email.WriteString(fmt.Sprintf("From %s\n", msg.Sender()))
 		for _, hdr := range msg.AllHeaders() {
+			// Horrible date fix. And this is esp awkward because our choices for header manipulation
+			// are either a map, where we lose ordering, or a slice, where we don't have keys.
+			if fix_date == true {
+				k := strings.Index(string(hdr), ":")
+				if k >= 1 {
+					date_hdr := string(hdr[0:k])
+					if date_hdr == "Date" {
+						hdr = "Date: " + msg.Headers()["Date"][0]
+
+					}
+				}
+			}
 			email.WriteString(hdr)
 			email.WriteString("\n")
 		}
 
+		// Read through the buffer so we can get to the next email.
 		email.WriteString("\n")
 		bodyReader := msg.BodyReader()
 		for err == nil {
@@ -192,33 +254,28 @@ func main() {
 			}
 			email.Write(buffer[0:n])
 		}
-
+		
 		if err == io.EOF {
 			// lines now contains the collected body of the most recently
 			// read message.
 		}
 
-		encoded := base64.URLEncoding.EncodeToString(email.Bytes())
-		// Upload the message
+		if process_msg {
+			encoded := base64.URLEncoding.EncodeToString(email.Bytes())
+			
+			// Horrible hack for inconsistent case
+			mid := msg.Headers()["Message-ID"]
+			if mid == nil {
+				mid = msg.Headers()["Message-Id"]
+			}
+			if mid == nil {
+				mid = msg.Headers()["Message-id"]
+			}
 
-		// Horrible hack
-		mid := msg.Headers()["Message-ID"]
-		if mid == nil {
-			mid = msg.Headers()["Message-Id"]
-		}
-
-		mdate := msg.Headers()["Date"]
-		// Date fix
-		const longForm = "Mon, 17 Jul 18:12:04 2000 -0500"
-		t, err := time.Parse(longForm, mdate[0])
-		if err == nil {
-			fmt.Println("fix date", t)
-		}
-
-		if *no_upload != true {
-			if *only_msgno != "" && msgno[cnt] == 1 {
+			// Upload the message
+			if *no_upload != true {				
 				fmt.Printf("%s:%d Uploading %d bytes\n", fn, cnt, len(encoded))
-
+				
 				r, err := srv.Users.Messages.Import(user, &gmail.Message{Raw: encoded}).Do()
 				if err != nil {
 					fmt.Printf("%s:%d FAILED to import message ID %s: %v\n",
@@ -227,18 +284,18 @@ func main() {
 					fmt.Printf("%s:%d ID %s successful %s\n", fn, cnt, r.Id, mid)
 					upld++
 				}
-			}
-		} else {
-			if *only_msgno != "" && msgno[cnt] == 1 {
+			} else {
+				fmt.Printf("%s:%d:\n", fn, cnt)
 				if *print_encoded != true {
 					fmt.Printf(email.String())
 				} else {
 					fmt.Println(encoded)
+
 				}
 			}
 		}
 		cnt++
 	}
 	fmt.Printf("%s %d messages uploaded out of %d processed.\n", fn, upld, cnt)
-
+	
 }
