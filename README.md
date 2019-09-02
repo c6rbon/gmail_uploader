@@ -26,7 +26,7 @@ This tool inserts mail from an mbox into the credential owner's Gmail account.
 
   * parse the mailbox
   * print each message as it is parsed
-  * output the base64 url encoded version of the message (useful for manually using the [API via a browser](https://developers.google.com/gmail/api/v1/reference/users/messages/import))
+  * optionally output the base64 url encoded version of the message if you use `-print_encoded` (useful for manually using the [API via a browser](https://developers.google.com/gmail/api/v1/reference/users/messages/import))
 
 * `-only_msgno` takes a series of comma deliniated message indices
 
