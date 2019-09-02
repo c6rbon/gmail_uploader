@@ -11,7 +11,7 @@ This tool inserts mail from an mbox into the credential owner's Gmail account.
 * You need a GCP project and credential. Follow the instructions on the [Gmail API Quickstart](https://developers.google.com/gmail/api/quickstart/go) to get that set up, and install the golang libraries.
 * Set up the mbox library
   * `go get -u github.com/sam-falvo/mbox.git`
-  * go to the mbox directory, and `git apply` the included `sam-falvo-mbox.diff`
+  * go to the mbox directory, and `git apply` the included `sam-falvo-mbox.diff` (This is needed so we can get strictly ordered headers. My patch is not pretty.)
 * `go build` etc.
 * The first time you use it, will auth the needed OAuth scopes, and cache the token in `~/.credentials`.
 
