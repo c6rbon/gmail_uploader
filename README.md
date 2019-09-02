@@ -20,13 +20,19 @@ This tool inserts mail from an mbox into the credential owner's Gmail account.
 * Most logs are to stdout, prefixed by the mail file for easy grepping. FAILED imports attempt to provide mail file, message number and Message-id so you can try again, or debug the mbox.
 * This generally relies on MBOXO parsing, but does a fallback check if there is a `Content-Length` field in the header. If there is, it will respect that.
 
-## Testing
+## Flags
 
-This supports a `-n` argument, which prevents actual message uploads, but will:
+* `-n` which prevents actual message uploads, but will:
 
-* parse the mailbox
-* print each message as it is parsed
-* output the base64 url encoded version of the message (useful for manually using the [API via a browser](https://developers.google.com/gmail/api/v1/reference/users/messages/import))
+  * parse the mailbox
+  * print each message as it is parsed
+  * output the base64 url encoded version of the message (useful for manually using the [API via a browser](https://developers.google.com/gmail/api/v1/reference/users/messages/import))
+
+* `-only_msgno` takes a series of comma deliniated message indices
+
+* `-print_encoded` only makes sense when used it `-n`; it will print the base64 email instead of clear. Usedul for manual API testing.
+
+* `-label` will attach a gmail label onto all uploaded messages
 
 ## Examples
 
@@ -35,7 +41,7 @@ This supports a `-n` argument, which prevents actual message uploads, but will:
 Insert all mail:
 
 ```
-./gmail_uploader my.mbox
+./gmail_uploader -label imported my.mbox
 ```
 
 Insert just message numbers 7 and 9:
