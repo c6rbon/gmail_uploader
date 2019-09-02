@@ -29,6 +29,7 @@ import (
 var no_upload = flag.Bool("n", false, "Do not actually upload. Print messages instead.")
 var print_encoded = flag.Bool("print_encoded", false, "When printing messages instead of uploading, print encoded value.")
 var only_msgno = flag.String("only_msgno", "", "Comma separated list of message number to constrain uploads to.")
+var label = flag.String("label", "", "Comma separated list of labels to attach to uploaded messages.")
 
 // getClient uses a Context and Config to retrieve a Token
 // then generate a Client. It returns the generated Client.
@@ -162,6 +163,20 @@ func main() {
 
 	user := "me"
 
+	labelids := []string{}
+	if *label != "" {
+		r, err := srv.Users.Labels.List(user).Do()
+		if err != nil {
+			log.Fatalf("Unable to retrieve labels: %v", err)
+		}
+		for _, l := range r.Labels {
+			if l.Name == *label {
+				labelids = append(labelids, l.Id)
+				fmt.Printf("[Using label %s (%s)]\n", l.Name, l.Id)
+			}
+		}
+	}
+		
 	cnt := 0
 	upld := 0
 
@@ -276,7 +291,8 @@ func main() {
 			if *no_upload != true {				
 				fmt.Printf("%s:%d Uploading %d bytes\n", fn, cnt, len(encoded))
 				
-				r, err := srv.Users.Messages.Import(user, &gmail.Message{Raw: encoded}).Do()
+				r, err := srv.Users.Messages.Import(user, &gmail.Message{
+					Raw: encoded, LabelIds: labelids}).Do()
 				if err != nil {
 					fmt.Printf("%s:%d FAILED to import message ID %s: %v\n",
 						fn, cnt, mid, err)
